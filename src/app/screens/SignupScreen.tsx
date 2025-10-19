@@ -54,7 +54,6 @@ export default function SignupScreen({ navigation }: Props) {
         return;
       }
 
-      // 2️⃣ Insertion manuelle du profil dans la table `profiles`
       const username =
         user.email?.split("@")[0] || "user_" + user.id.substring(0, 8);
 

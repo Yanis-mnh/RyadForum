@@ -17,25 +17,21 @@ import { QuestionRow, Question as QuestionType } from "../../types";
 
 function useSupabaseAuth() {
   const [user, setUser] = useState<any>(null);
-
   useEffect(() => {
     const getUser = async () => {
       const { data } = await supabase.auth.getUser();
       setUser(data.user);
     };
     getUser();
-
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user || null);
       }
     );
-
     return () => {
       listener.subscription.unsubscribe();
     };
   }, []);
-
   return user;
 }
 
@@ -49,7 +45,7 @@ interface ReponseType {
 }
 
 export default function HomeScreen({ navigation }: any) {
-  const user = useSupabaseAuth(); // 👈 Hook d'auth
+  const user = useSupabaseAuth();
   const [firstLetter, setFirstLetter] = useState("?");
   const [questions, setQuestions] = useState<QuestionType[]>([]);
   const [reponses, setReponses] = useState<Record<string, ReponseType[]>>({});
@@ -57,7 +53,6 @@ export default function HomeScreen({ navigation }: any) {
     Record<string, boolean>
   >({});
   const [showReplies, setShowReplies] = useState<Record<string, boolean>>({});
-
   const [modalVisible, setModalVisible] = useState(false);
   const [currentQuestionId, setCurrentQuestionId] = useState<string | null>(
     null
@@ -66,6 +61,40 @@ export default function HomeScreen({ navigation }: any) {
 
   useEffect(() => {
     fetchQuestions();
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("questions-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "questions" },
+        () => {
+          fetchQuestions();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel("responses-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "responses" },
+        (payload) => {
+          const questionId =
+            payload.new?.question_id || payload.old?.question_id;
+          if (questionId) fetchReponses(questionId);
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   useEffect(() => {
@@ -80,18 +109,9 @@ export default function HomeScreen({ navigation }: any) {
     try {
       const res = await supabase
         .from("questions")
-        .select(
-          `id, title, content, author_id, theme_id, created_at,
-           author:profiles(id, username),
-           theme:themes(id, name)`
-        )
+        .select(`id, title, content, author_id, theme_id, created_at`)
         .order("created_at", { ascending: false });
-
-      if (res.error) {
-        console.error("Erreur fetch questions:", res.error);
-        return;
-      }
-
+      if (res.error) return;
       const rows = (res.data || []) as QuestionRow[];
       const normalized = rows.map((r) => {
         const author = r.author?.[0];
@@ -112,28 +132,18 @@ export default function HomeScreen({ navigation }: any) {
         } as QuestionType;
       });
       setQuestions(normalized);
-    } catch (err) {
-      console.error("fetchQuestions error:", err);
-    }
+    } catch (err) {}
   };
 
   const fetchReponses = async (questionId: string) => {
     try {
       setLoadingReponses((prev) => ({ ...prev, [questionId]: true }));
-
       const res = await supabase
         .from("responses")
-        .select(
-          "id, question_id, author_id, content, created_at, author:profiles(id, username)"
-        )
+        .select("id, question_id, content, created_at")
         .eq("question_id", questionId)
         .order("created_at", { ascending: true });
-
-      if (res.error) {
-        console.error("Erreur fetch réponses:", res.error);
-        return;
-      }
-
+      if (res.error) return;
       const rows = (res.data || []) as any[];
       const normalized: ReponseType[] = rows.map((r) => {
         const authorArr = r.author ?? [];
@@ -149,11 +159,9 @@ export default function HomeScreen({ navigation }: any) {
             : undefined,
         } as ReponseType;
       });
-
       setReponses((prev) => ({ ...prev, [questionId]: normalized }));
       setShowReplies((prev) => ({ ...prev, [questionId]: true }));
     } catch (err) {
-      console.error("fetchReponses error:", err);
     } finally {
       setLoadingReponses((prev) => ({ ...prev, [questionId]: false }));
     }
@@ -183,7 +191,6 @@ export default function HomeScreen({ navigation }: any) {
       Alert.alert("Erreur", "Écris quelque chose avant d'envoyer.");
       return;
     }
-
     try {
       const userRes = await supabase.auth.getUser();
       const userId = userRes.data.user?.id;
@@ -192,7 +199,6 @@ export default function HomeScreen({ navigation }: any) {
         setModalVisible(false);
         return;
       }
-
       const insertRes = await supabase
         .from("responses")
         .insert({
@@ -201,21 +207,17 @@ export default function HomeScreen({ navigation }: any) {
           author_id: userId,
         })
         .select("id");
-
       if (insertRes.error) {
-        console.error("insert response error:", insertRes.error);
         Alert.alert(
           "Erreur",
           insertRes.error.message || "Impossible d'ajouter la réponse."
         );
         return;
       }
-
       await fetchReponses(currentQuestionId);
       setNewReponseText("");
       setModalVisible(false);
     } catch (err) {
-      console.error("handleAddReponse error:", err);
       Alert.alert("Erreur", "Impossible d'ajouter la réponse.");
     }
   };
@@ -224,7 +226,6 @@ export default function HomeScreen({ navigation }: any) {
     <View style={{ flex: 1 }}>
       <View style={styles.topBar}>
         <Text style={styles.title}>RyadForum</Text>
-
         <TouchableOpacity
           style={styles.profileBtn}
           onPress={() => {
@@ -234,17 +235,14 @@ export default function HomeScreen({ navigation }: any) {
           <Text style={styles.profileLetter}>{firstLetter}</Text>
         </TouchableOpacity>
       </View>
-
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {questions.map((q) => (
           <View key={q.id}>
             <Question questionText={q.title} questionId={q.id}>
               {q.content && <Reponse content={q.content} />}
-
               {loadingReponses[q.id] && (
                 <ActivityIndicator size="small" style={{ marginVertical: 6 }} />
               )}
-
               {showReplies[q.id] &&
                 (reponses[q.id]?.length ? (
                   reponses[q.id].map((r) => (
@@ -255,7 +253,6 @@ export default function HomeScreen({ navigation }: any) {
                     Aucune réponse pour l'instant.
                   </Text>
                 ))}
-
               <TouchableOpacity
                 style={styles.replyBtn}
                 onPress={() => handleOpenModal(q.id)}
@@ -266,16 +263,12 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         ))}
       </ScrollView>
-
       <TouchableOpacity
         style={styles.addBtn}
-        onPress={async () => {
-          navigation.navigate("AddQuestion");
-        }}
+        onPress={async () => navigation.navigate("AddQuestion")}
       >
         <Text style={styles.addBtnText}>+</Text>
       </TouchableOpacity>
-
       <Modal
         visible={modalVisible}
         transparent
