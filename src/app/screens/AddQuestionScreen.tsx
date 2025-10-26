@@ -123,14 +123,6 @@ export default function AddQuestionScreen({ navigation }: Props) {
         </View>
       )}
 
-      <TextInput
-        placeholder="Contenu de la question"
-        value={content}
-        onChangeText={setContent}
-        multiline
-        style={[styles.input, { height: 140 }]}
-      />
-
       <TouchableOpacity
         style={[styles.btn, submitting ? { opacity: 0.7 } : {}]}
         onPress={handleAddQuestion}
