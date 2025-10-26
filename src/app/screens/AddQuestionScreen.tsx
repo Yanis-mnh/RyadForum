@@ -18,7 +18,6 @@ interface Props {
 
 export default function AddQuestionScreen({ navigation }: Props) {
   const [title, setTitle] = useState<string>("");
-  const [content, setContent] = useState<string>("");
   const [themes, setThemes] = useState<Theme[]>([]);
   const [selectedTheme, setSelectedTheme] = useState<string>("");
   const [loadingThemes, setLoadingThemes] = useState<boolean>(true);
@@ -50,7 +49,7 @@ export default function AddQuestionScreen({ navigation }: Props) {
   };
 
   const handleAddQuestion = async () => {
-    if (!title.trim() || !content.trim() || !selectedTheme) {
+    if (!title.trim() || !selectedTheme) {
       Alert.alert("Erreur", "Veuillez remplir tous les champs");
       return;
     }
@@ -74,7 +73,6 @@ export default function AddQuestionScreen({ navigation }: Props) {
         .from("questions")
         .insert({
           title: title.trim(),
-          content: content.trim(),
           theme_id: selectedTheme,
           author_id: userId,
         })
