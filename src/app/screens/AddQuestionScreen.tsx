@@ -100,7 +100,7 @@ export default function AddQuestionScreen({ navigation }: Props) {
       <Text style={styles.title}>Nouvelle Question</Text>
 
       <TextInput
-        placeholder="Titre"
+        placeholder="Question"
         value={title}
         onChangeText={setTitle}
         style={styles.input}
