@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -113,24 +115,14 @@ export default function HomeScreen({ navigation }: any) {
         .order("created_at", { ascending: false });
       if (res.error) return;
       const rows = (res.data || []) as QuestionRow[];
-      const normalized = rows.map((r) => {
-        const author = r.author?.[0];
-        const theme = r.theme?.[0];
-        return {
-          id: r.id,
-          title: r.title,
-          content: r.content,
-          author_id: r.author_id ?? undefined,
-          theme_id: r.theme_id ?? undefined,
-          created_at: r.created_at,
-          author: author
-            ? { id: author.id ?? "", username: author.username ?? "" }
-            : undefined,
-          theme: theme
-            ? { id: theme.id ?? "", name: theme.name ?? "" }
-            : undefined,
-        } as QuestionType;
-      });
+      const normalized = rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        content: r.content,
+        author_id: r.author_id ?? undefined,
+        theme_id: r.theme_id ?? undefined,
+        created_at: r.created_at,
+      })) as QuestionType[];
       setQuestions(normalized);
     } catch (err) {}
   };
@@ -145,20 +137,12 @@ export default function HomeScreen({ navigation }: any) {
         .order("created_at", { ascending: true });
       if (res.error) return;
       const rows = (res.data || []) as any[];
-      const normalized: ReponseType[] = rows.map((r) => {
-        const authorArr = r.author ?? [];
-        const authorObj = authorArr.length > 0 ? authorArr[0] : undefined;
-        return {
-          id: r.id,
-          question_id: r.question_id,
-          author_id: r.author_id ?? undefined,
-          content: r.content,
-          created_at: r.created_at,
-          author: authorObj
-            ? { id: authorObj.id ?? "", username: authorObj.username ?? "" }
-            : undefined,
-        } as ReponseType;
-      });
+      const normalized: ReponseType[] = rows.map((r) => ({
+        id: r.id,
+        question_id: r.question_id,
+        content: r.content,
+        created_at: r.created_at,
+      }));
       setReponses((prev) => ({ ...prev, [questionId]: normalized }));
       setShowReplies((prev) => ({ ...prev, [questionId]: true }));
     } catch (err) {
@@ -224,6 +208,7 @@ export default function HomeScreen({ navigation }: any) {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Barre du haut */}
       <View style={styles.topBar}>
         <Text style={styles.title}>RyadForum</Text>
         <TouchableOpacity
@@ -235,6 +220,8 @@ export default function HomeScreen({ navigation }: any) {
           <Text style={styles.profileLetter}>{firstLetter}</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Contenu scrollable */}
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {questions.map((q) => (
           <View key={q.id}>
@@ -263,19 +250,26 @@ export default function HomeScreen({ navigation }: any) {
           </View>
         ))}
       </ScrollView>
+
+      {/* Bouton pour ajouter une question */}
       <TouchableOpacity
         style={styles.addBtn}
-        onPress={async () => navigation.navigate("AddQuestion")}
+        onPress={() => navigation.navigate("AddQuestion")}
       >
         <Text style={styles.addBtnText}>+</Text>
       </TouchableOpacity>
+
+      {/* Modal pour répondre */}
       <Modal
         visible={modalVisible}
         transparent
         animationType="fade"
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalBackdrop}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.modalBackdrop}
+        >
           <View style={styles.modalContent}>
             <Text style={{ fontWeight: "700", fontSize: 16, marginBottom: 10 }}>
               Écrire une réponse
@@ -302,7 +296,7 @@ export default function HomeScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -341,7 +335,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 120,
     backgroundColor: "#f7f9fc",
-    height: "100%",
+    flexGrow: 1,
   },
   replyBtn: {
     marginTop: 8,
